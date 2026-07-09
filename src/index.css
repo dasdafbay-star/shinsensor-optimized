@@ -113,6 +113,26 @@
   .duotone {
     filter: grayscale(85%) contrast(112%) brightness(0.85);
   }
+  .loader {
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    border-radius: 9999px;
+    background: var(--color-ink);
+    animation: loader-pulse 1.1s ease-in-out infinite;
+  }
+}
+
+@keyframes loader-pulse {
+  0%,
+  100% {
+    transform: scale(0.8);
+    opacity: 0.25;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 0.75;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

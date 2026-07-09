@@ -1,9 +1,26 @@
 import { useEffect, useRef } from 'react'
 import { gsap, prefersReducedMotion } from '../lib/gsap'
 import { CONTACT, EQUIPMENT, waLink } from '../content'
+import { SplineScene } from './ui/SplineScene'
+import { useMediaQuery } from '../hooks/useMediaQuery'
+
+const SENSOR_SCENE = 'https://prod.spline.design/DHqiQXjDwRx24fah/scene.splinecode'
+
+function SensorSpline({ className }) {
+  return (
+    <div data-hero-el className={`rounded-2xl overflow-hidden border border-white/10 ${className}`}>
+      <SplineScene scene={SENSOR_SCENE} className="w-full h-full" />
+      <span className="pointer-events-none absolute top-3 left-3 mono-label text-[9px] text-amber-400/80 flex items-center gap-1.5">
+        <span className="size-1 rounded-full bg-amber-400 animate-pulse" />
+        3D превью
+      </span>
+    </div>
+  )
+}
 
 export default function Hero() {
   const rootRef = useRef(null)
+  const isXl = useMediaQuery('(min-width: 1280px)')
 
   useEffect(() => {
     if (prefersReducedMotion) return
@@ -71,6 +88,8 @@ export default function Hero() {
           шиномонтажка.
         </p>
 
+        {!isXl && <SensorSpline className="relative mt-8 mx-auto w-56 h-56 sm:w-64 sm:h-64" />}
+
         <div data-hero-el data-reveal className="mt-8 flex flex-wrap items-center gap-4">
           <a
             href={waLink()}
@@ -106,6 +125,10 @@ export default function Hero() {
           <span>{EQUIPMENT.join(' · ')}</span>
         </div>
       </div>
+
+      {isXl && (
+        <SensorSpline className="absolute top-1/2 right-6 2xl:right-12 -translate-y-1/2 w-[380px] h-[380px]" />
+      )}
     </section>
   )
 }
