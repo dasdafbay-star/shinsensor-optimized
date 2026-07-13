@@ -2,19 +2,22 @@ import { useEffect, useRef } from 'react'
 import { gsap, prefersReducedMotion } from '../lib/gsap'
 import { CONTACT, EQUIPMENT, waLink } from '../content'
 import { SplineScene } from './ui/SplineScene'
+import { ErrorBoundary } from './ui/ErrorBoundary'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 
 const SENSOR_SCENE = 'https://prod.spline.design/DHqiQXjDwRx24fah/scene.splinecode'
 
 function SensorSpline({ className }) {
   return (
-    <div data-hero-el className={`rounded-2xl overflow-hidden border border-white/10 ${className}`}>
-      <SplineScene scene={SENSOR_SCENE} className="w-full h-full" />
-      <span className="pointer-events-none absolute top-3 left-3 mono-label text-[9px] text-amber-400/80 flex items-center gap-1.5">
-        <span className="size-1 rounded-full bg-amber-400 animate-pulse" />
-        3D превью
-      </span>
-    </div>
+    <ErrorBoundary>
+      <div data-hero-el className={`rounded-2xl overflow-hidden border border-white/10 ${className}`}>
+        <SplineScene scene={SENSOR_SCENE} className="w-full h-full" />
+        <span className="pointer-events-none absolute top-3 left-3 mono-label text-[9px] text-amber-400/80 flex items-center gap-1.5">
+          <span className="size-1 rounded-full bg-amber-400 animate-pulse" />
+          3D превью
+        </span>
+      </div>
+    </ErrorBoundary>
   )
 }
 
