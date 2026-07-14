@@ -3,15 +3,11 @@ import { gsap, ScrollTrigger, prefersReducedMotion } from '../lib/gsap'
 
 export default function Counter({ value, decimals = 0, suffix = '' }) {
   const ref = useRef(null)
+  const formatted = value.toFixed(decimals) + suffix
 
   useEffect(() => {
     const el = ref.current
-    if (!el) return
-
-    if (prefersReducedMotion) {
-      el.textContent = value.toFixed(decimals) + suffix
-      return
-    }
+    if (!el || prefersReducedMotion) return
 
     const obj = { val: 0 }
     const trigger = ScrollTrigger.create({
@@ -19,19 +15,26 @@ export default function Counter({ value, decimals = 0, suffix = '' }) {
       start: 'top 90%',
       once: true,
       onEnter: () => {
-        gsap.to(obj, {
-          val: value,
-          duration: 1.6,
-          ease: 'power1.out',
-          onUpdate: () => {
-            el.textContent = obj.val.toFixed(decimals) + suffix
-          },
-        })
+        gsap.fromTo(
+          obj,
+          { val: 0 },
+          {
+            val: value,
+            duration: 1.6,
+            ease: 'power1.out',
+            onUpdate: () => {
+              el.textContent = obj.val.toFixed(decimals) + suffix
+            },
+          }
+        )
       },
     })
 
     return () => trigger.kill()
   }, [value, decimals, suffix])
 
-  return <span ref={ref}>0{suffix}</span>
+  // Initial DOM text is the real final value, not 0 — the count-up is a
+  // client-side enhancement layered on top via GSAP once scrolled into
+  // view, so prerendered HTML and no-JS crawlers see correct numbers.
+  return <span ref={ref}>{formatted}</span>
 }
