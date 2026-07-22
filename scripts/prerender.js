@@ -30,69 +30,84 @@ async function scrollThroughPage(page) {
   await new Promise((r) => setTimeout(r, 500))
 }
 
-async function main() {
+async function prerender() {
   const server = await preview({
     preview: { port: 4174, strictPort: false, open: false },
   })
-  const url = server.resolvedUrls?.local?.[0]
-  if (!url) throw new Error('Could not resolve a local preview URL')
-
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: [
-      '--use-gl=swiftshader',
-      '--enable-webgl',
-      '--ignore-gpu-blocklist',
-      '--no-sandbox',
-    ],
-  })
 
   try {
-    const page = await browser.newPage()
-    page.on('pageerror', (err) => console.error('[prerender] page error:', err.message))
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') console.error('[prerender] console error:', msg.text())
+    const url = server.resolvedUrls?.local?.[0]
+    if (!url) throw new Error('Could not resolve a local preview URL')
+
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--use-gl=swiftshader',
+        '--enable-webgl',
+        '--ignore-gpu-blocklist',
+        '--no-sandbox',
+        // Containerized CI builders (Netlify's included) often mount a tiny
+        // /dev/shm, which crashes Chromium under load unless disabled.
+        '--disable-dev-shm-usage',
+      ],
     })
 
-    await page.setViewport({ width: 1440, height: 900 })
-    await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 })
+    try {
+      const page = await browser.newPage()
+      page.on('pageerror', (err) => console.error('[prerender] page error:', err.message))
+      page.on('console', (msg) => {
+        if (msg.type() === 'error') console.error('[prerender] console error:', msg.text())
+      })
 
-    // Wait for the hero heading — the GSAP hero intro animation and the
-    // lazy-loaded Spline scene are allowed to still be in flight/failed,
-    // we only need the actual text content to exist in the DOM.
-    await page.waitForFunction(
-      () => document.querySelector('h1')?.textContent.trim().length > 0,
-      { timeout: 20000 }
-    )
+      await page.setViewport({ width: 1440, height: 900 })
+      await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 })
 
-    // Let the hero's own intro animation (gsap.from + stagger) settle.
-    await new Promise((r) => setTimeout(r, 1500))
-
-    await scrollThroughPage(page)
-
-    const rawHtml = await page.evaluate(() => document.documentElement.outerHTML)
-
-    // Some dynamically-injected tags (e.g. modulepreload links for lazy
-    // chunks like the Spline scene) get resolved to the preview server's
-    // absolute origin. Strip it back down to root-relative paths so the
-    // shipped HTML doesn't point at localhost.
-    const html = rawHtml.split(new URL(url).origin).join('')
-
-    if (!html.includes(REQUIRED_TEXT)) {
-      throw new Error(
-        `Prerendered HTML is missing expected content ("${REQUIRED_TEXT}") — aborting without touching dist/index.html`
+      // Wait for the hero heading — the GSAP hero intro animation and the
+      // lazy-loaded Spline scene are allowed to still be in flight/failed,
+      // we only need the actual text content to exist in the DOM.
+      await page.waitForFunction(
+        () => document.querySelector('h1')?.textContent.trim().length > 0,
+        { timeout: 20000 }
       )
-    }
 
-    writeFileSync(distIndexPath, `<!doctype html>\n${html}\n`)
-    console.log(`[prerender] dist/index.html rewritten (${html.length} bytes)`)
+      // Let the hero's own intro animation (gsap.from + stagger) settle.
+      await new Promise((r) => setTimeout(r, 1500))
+
+      await scrollThroughPage(page)
+
+      const rawHtml = await page.evaluate(() => document.documentElement.outerHTML)
+
+      // Some dynamically-injected tags (e.g. modulepreload links for lazy
+      // chunks like the Spline scene) get resolved to the preview server's
+      // absolute origin. Strip it back down to root-relative paths so the
+      // shipped HTML doesn't point at localhost.
+      const html = rawHtml.split(new URL(url).origin).join('')
+
+      if (!html.includes(REQUIRED_TEXT)) {
+        throw new Error(
+          `Prerendered HTML is missing expected content ("${REQUIRED_TEXT}") — aborting without touching dist/index.html`
+        )
+      }
+
+      writeFileSync(distIndexPath, `<!doctype html>\n${html}\n`)
+      console.log(`[prerender] dist/index.html rewritten (${html.length} bytes)`)
+    } finally {
+      await browser.close()
+    }
   } finally {
-    await browser.close()
     await new Promise((r) => server.httpServer.close(r))
   }
 }
 
-main().catch((err) => {
-  console.error('[prerender] failed:', err)
-  process.exit(1)
-})
+// Prerendering is an SEO enhancement layered on top of an already-working
+// client-rendered SPA — it must never be able to block a deploy. If
+// Puppeteer/Chromium has a bad day in the build container (a known flaky
+// failure mode in containerized CI runners), log it loudly and exit 0 so
+// `vite build`'s plain output still ships instead of the site getting
+// stuck on whatever the last successful deploy happened to be.
+prerender()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error('[prerender] SKIPPED — prerendering failed, shipping the plain vite build instead:', err)
+    process.exit(0)
+  })
